@@ -35,10 +35,12 @@ describe('local volume connection testing', function () {
     });
 
     test('returns error when directory does not exist and cannot be created', function () {
+        // /dev/null is a character device, not a directory — mkdir under it
+        // always fails with ENOTDIR regardless of user (works for root in CI).
         $volume = new Volume([
             'name' => 'test-volume',
             'type' => 'local',
-            'config' => ['path' => '/nonexistent-root-'.uniqid().'/subdir'],
+            'config' => ['path' => '/dev/null/subdir'],
         ]);
 
         $result = $this->tester->test($volume);
