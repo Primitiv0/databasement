@@ -4,10 +4,8 @@ namespace App\Http\Requests\Api\V1;
 
 use App\Enums\DatabaseSelectionMode;
 use App\Enums\DatabaseType;
-use App\Enums\VolumeType;
 use App\Models\Backup;
 use App\Models\DatabaseServer;
-use App\Models\Volume;
 use App\Rules\SafePath;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -32,7 +30,6 @@ class SaveDatabaseServerRequest extends FormRequest
             'description' => 'nullable|string|max:1000',
             'backups_enabled' => 'boolean',
             'ssh_config_id' => 'nullable|exists:database_server_ssh_configs,id',
-            'agent_id' => 'nullable|exists:agents,id',
             'managed_by' => 'nullable|string|max:255',
         ];
 
@@ -63,13 +60,7 @@ class SaveDatabaseServerRequest extends FormRequest
             $rules['auth_source'] = 'nullable|string|max:255';
         }
 
-        /** @var DatabaseServer|null $existing */
-        $existing = $this->route('database_server');
-        $backupsEnabled = $this->has('backups_enabled')
-            ? $this->boolean('backups_enabled')
-            : ($existing !== null ? $existing->backups_enabled : true);
-
-        if ($backupsEnabled) {
+        if ($this->backupsEnabled()) {
             $rules['backups'] = 'required|array|min:1';
             $rules['backups.*.volume_id'] = 'required|exists:volumes,id';
             $rules['backups.*.path'] = ['nullable', 'string', 'max:255', new SafePath];
@@ -97,13 +88,7 @@ class SaveDatabaseServerRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
-            /** @var DatabaseServer|null $existing */
-            $existing = $this->route('database_server');
-            $backupsEnabled = $this->has('backups_enabled')
-                ? $this->boolean('backups_enabled')
-                : ($existing !== null ? $existing->backups_enabled : true);
-
-            if (! $backupsEnabled) {
+            if (! $this->backupsEnabled()) {
                 return;
             }
 
@@ -113,14 +98,26 @@ class SaveDatabaseServerRequest extends FormRequest
                 return;
             }
 
-            $isAgent = $this->has('agent_id')
-                ? $this->filled('agent_id')
-                : ($existing?->agent_id !== null);
-
             foreach ($backups as $index => $backup) {
-                $this->validateBackupEntry($validator, $index, is_array($backup) ? $backup : [], $isAgent);
+                $this->validateBackupEntry($validator, $index, is_array($backup) ? $backup : []);
             }
         });
+    }
+
+    /**
+     * Resolve whether backups are enabled for this request: explicit input wins,
+     * otherwise fall back to the existing server's flag (defaulting to true).
+     */
+    private function backupsEnabled(): bool
+    {
+        if ($this->has('backups_enabled')) {
+            return $this->boolean('backups_enabled');
+        }
+
+        /** @var DatabaseServer|null $existing */
+        $existing = $this->route('database_server');
+
+        return $existing !== null ? $existing->backups_enabled : true;
     }
 
     /**
@@ -128,15 +125,8 @@ class SaveDatabaseServerRequest extends FormRequest
      *
      * @param  array<string, mixed>  $backup
      */
-    private function validateBackupEntry(Validator $validator, int $index, array $backup, bool $isAgent): void
+    private function validateBackupEntry(Validator $validator, int $index, array $backup): void
     {
-        if ($isAgent) {
-            $volumeId = $backup['volume_id'] ?? null;
-            if ($volumeId !== null && Volume::whereKey($volumeId)->where('type', VolumeType::LOCAL->value)->exists()) {
-                $validator->errors()->add("backups.{$index}.volume_id", 'Local volumes cannot be used with remote agents.');
-            }
-        }
-
         $retentionPolicy = $backup['retention_policy'] ?? null;
 
         if ($retentionPolicy === Backup::RETENTION_DAYS && empty($backup['retention_days'])) {
