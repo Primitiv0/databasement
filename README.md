@@ -5,9 +5,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/David-Crty/databasement/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/David-Crty/databasement" alt="License" />
-  </a>
   <a href="https://app.codecov.io/gh/David-Crty/databasement">
     <img src="https://codecov.io/gh/David-Crty/databasement/graph/badge.svg" alt="Code Coverage" />
   </a>
