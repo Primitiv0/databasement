@@ -7,6 +7,19 @@
 
     @include('livewire.configuration._tabs', ['active' => 'roles'])
 
+    <x-alert icon="o-information-circle" class="alert-info mb-4">
+        {{ __('Roles bundle abilities that control what users can do in each organization.') }}
+        <x-slot:actions>
+            <x-button
+                :label="__('Learn more')"
+                link="https://david-crty.github.io/databasement/user-guide/permissions"
+                external
+                icon="o-book-open"
+                class="btn-sm"
+            />
+        </x-slot:actions>
+    </x-alert>
+
     @can('create', \Silber\Bouncer\Database\Role::class)
         <div class="flex justify-end mb-4">
             <x-button :label="__('New role')" icon="o-plus" wire:click="openCreate" class="btn-primary btn-sm" />
